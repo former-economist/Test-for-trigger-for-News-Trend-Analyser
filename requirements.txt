@@ -8,3 +8,5 @@ gnews
 newspaper3k
 textblob
 datetime
+SQLAlchemy
+mariadb
