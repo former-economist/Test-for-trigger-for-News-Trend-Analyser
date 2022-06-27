@@ -1,0 +1,3 @@
+CREATE DATABASE IF NOT EXISTS articles;
+CREATE USER IF NOT EXISTS 'searcher'@'%' IDENTIFIED BY 'sdB5Ag3s';
+GRANT ALL PRIVILEGES ON articles.* TO 'searcher'@'%';
