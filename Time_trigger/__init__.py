@@ -1,6 +1,8 @@
 import logging
 import os
+import gnews
 from sqlalchemy.orm import Session
+import datetime
 
 import json
 from . import models
@@ -9,7 +11,6 @@ from datetime import date
 import sqlalchemy
 from textblob import TextBlob
 from gnews import GNews
-from flask import jsonify
 
 __test_db_engine__ = None
 
@@ -47,8 +48,20 @@ def create_search_string(topic: str, blocked_words: list):
 
     return primary_search
 
+def create_instance_for_day() -> GNews:
+    """
+    A function that creats a google news object to search for articles
+    published from the last day.
+
+    Returns:
+        GNews: GNews object to search for published with the last day.
+    """
+    google_object = GNews()
+    google_object.period = '1d'
+    return google_object
+
 def create_instance():
-    """A function that creates an instance object of a GNews
+    """A function that creates an instance object of a GNews.
 
     Returns:
         GNews: A google news class object that will be used to carry out searches.
@@ -114,45 +127,10 @@ def analysis_sentiment(search_results: list):
         blob = TextBlob(string)
         sentiment = blob.sentiment.polarity
         article['sentiment'] = sentiment
-    
-    
 
-def main(req: func.HttpRequest) -> func.HttpResponse:
-    global __test_db_connection_string__
-
-    logging.info('Python HTTP trigger function processed a request.')
-
-    # If GET request, get values and assign to variables.
-    if req.method == "GET":
-        topic = req.params.get('topic')
-        blocked_words = req.params.get('blocked-words')
-        is_dated = req.params.get('is-dated')
-        
-    #If POST request, get values from request and assign to varaibles.
-    elif req.method == "POST":
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            topic = None
-            blocked_words = None
-        else:
-            topic = req_body.get('topic')
-            blocked_words = req_body.get('blocked-words')
-            is_dated = req_body.get('is-dated')
-    
-    #If GET request is date restricted, assign start and end dates to varaiables.
-    #Create search instance depending on if date restericted. 
-    if is_dated == True:
-        start_date = req.params.get('start-date')
-        end_date = req.params.get('end-date')
-        search_instance = create_dated_instance(start_date, end_date)
-    else:
-        search_instance = create_instance()
-
-    search_string = create_search_string(topic, blocked_words)
-    found_articles = search(search_string, search_instance)
-    analysis_sentiment(found_articles)
-
+def main(mytimer: func.TimerRequest) -> None:
+    utc_timestamp = datetime.datetime.utcnow().replace(
+        tzinfo=datetime.timezone.utc).isoformat()
     
     #Get or create and engine
     if __test_db_engine__ is not None:
@@ -166,22 +144,24 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             connection_args["ssl_ca"] = ssl_cert
         engine = sqlalchemy.create_engine(connection_string, connect_args=connection_args, echo=False, future=True)
     
+    models.Base.metadata.create_all(engine)
+    session = Session(engine)
+
+    statement = sqlalchemy.select(models.Query.query)
+    queries = session.execute(statement)
+
+    todays_news = create_instance_for_day()
+
+    query_results = {}
     
-
-
-    if found_articles:
-        models.Base.metadata.create_all(engine)
-        session = Session(engine)
-
-        statement = sqlalchemy.select(models.Query).where(models.Query.query == search_string)
-        query = session.execute(statement).first()
-
-        if query is None:
-            query = models.Query(topic)
-        
-        # Extract article details from json and assign to variables.
-        for article in found_articles:
-            article_query = query
+    for query in queries.scalars():
+        found_articles = search(query, todays_news)
+        analysis_sentiment(found_articles)
+        query_results[query] = found_articles
+    
+    for article_query, articles in query_results.values():
+        for article in articles:
+            article_query = article_query
             article_publisher = article['publisher']['title']
             article_headline = article['title']
             article_desc = article['description']
@@ -189,7 +169,6 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             article_date = article['published date']
             article_sentiment = article['sentiment']
 
-            # Create new QueryResult
             result = models.QueryResult(
                 article_query,
                 article_publisher,
@@ -200,14 +179,6 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
                 article_sentiment
             )
 
-            # Add to database
             session.add(result)
             session.commit()
-        session.close()
-
-        return func.HttpResponse('ok', status_code=201)
-    else:
-        return func.HttpResponse(
-             "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.",
-             status_code=200
-        )
+    session.close()
