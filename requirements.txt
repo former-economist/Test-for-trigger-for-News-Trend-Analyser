@@ -10,3 +10,4 @@ textblob
 datetime
 SQLAlchemy
 mariadb
+dateparser

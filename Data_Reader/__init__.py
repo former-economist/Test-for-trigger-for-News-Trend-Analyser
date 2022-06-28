@@ -3,7 +3,6 @@ import os
 from telnetlib import SE
 from sqlalchemy.orm import Session
 
-
 from . import models
 import azure.functions as func
 from datetime import date
@@ -63,5 +62,5 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
             'sentiment': article.sentiment
         })
 
-    return func.HttpResponse(json.dumps(json_data).encode("utf8"), status_code=201)
+    return func.HttpResponse(json.dumps(json_data, default=str).encode("utf8"), status_code=201)
     
