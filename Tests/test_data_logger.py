@@ -21,7 +21,8 @@ class TestDataLogger(unittest.TestCase):
                 }
             ).encode('utf8'), 
             headers={"Accept": "application/json"},
-            url="/"
+            url="/?topic=scotland&blocked-words=['tories', 'Fox News']", 
+
         )
         response=Data_Logger.main(request)
         self.assertEqual(response.status_code, 201)

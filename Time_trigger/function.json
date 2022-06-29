@@ -1,11 +1,11 @@
-{
-    "scriptFile": "__init__.py",
-    "bindings": [
-        {
-            "name": "newsTimer",
-            "type": "timerTrigger",
-            "direction": "in",
-            "schedule": "0 0 12 * * *"
-        }
-    ]
-}
+// {
+//     "scriptFile": "__init__.py",
+//     "bindings": [
+//         {
+//             "name": "newsTimer",
+//             "type": "timerTrigger",
+//             "direction": "in",
+//             "schedule": "0 0 12 * * *"
+//         }
+//     ]
+// }
